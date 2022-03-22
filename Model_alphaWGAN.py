@@ -23,10 +23,11 @@ class Discriminator(nn.Module):
         self.conv4 = nn.Conv3d(channel//2, channel, kernel_size=4, stride=2, padding=1)
         self.bn4 = nn.BatchNorm3d(channel)
         self.conv5 = nn.Conv3d(channel, 1, kernel_size=4, stride=2, padding=1)
+        self.bn5 = nn.BatchNorm3d(1)
         self.leaky_relu = nn.LeakyReLU(0.2)
 
-        _inchannels = 2*2*5 if self._resolution == 64 else 2*2*5*512
-        self.dense1 = nn.Linear(_inchannels, channel)
+        self._inchannels = 2*2*5 if self._resolution == 64 else 2*2*5*512
+        self.dense1 = nn.Linear(self._inchannels, channel)
         self.dense2 = nn.Linear(channel, 1)
 
     def forward(self, x):
@@ -39,14 +40,14 @@ class Discriminator(nn.Module):
         h3 = self.leaky_relu(self.bn3(self.conv3(h2)))
         if self._resolution == 64:
             h4 = self.leaky_relu(self.bn4(self.conv4(h3)))
-            h5 = self.conv5(h4)
-            h5 = h5.view(-1)
+            h5 = self.leaky_relu(self.bn5(self.conv5(h4)))
+            h5 = h5.view(-1,self._inchannels)
             h5 = self.leaky_relu(self.dense1(h5))
             h5 = self.dense2(h5)
             return h5
         else:
-            h4 = self.conv4(h3)
-            h4 = h4.view(-1)
+            h4 = self.leaky_relu(self.bn4(self.conv4(h3)))
+            h4 = h4.view(-1,self._inchannels)
             h4 = self.leaky_relu(self.dense1(h4))
             h4 = self.dense2(h4)
             return h4
@@ -112,19 +113,19 @@ class Generator(nn.Module):
         h = h.view(-1,512,2,2,5)
         h = self.relu(self.bn1(h))
 
-        h = self.upsample(h,scale_factor = 2)
+        h = self.upsample(h)
         h = self.tp_conv2(h)
         h = self.relu(self.bn2(h))
         
-        h = self.upsample(h,scale_factor = 2)
+        h = self.upsample(h)
         h = self.tp_conv3(h)
         h = self.relu(self.bn3(h))
 
-        h = self.upsample(h,scale_factor = 2)
+        h = self.upsample(h)
         h = self.tp_conv4(h)
         h = self.relu(self.bn4(h))
 
-        h = self.upsample(h,scale_factor = 2)
+        h = self.upsample(h)
         h = self.tp_conv5(h)
 
         h = self.tanh(h)
